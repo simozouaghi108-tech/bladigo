@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Receipt Builder - 80mm + Bluetooth</title>
+  <title>فاتورة 80mm + تحميل صورة + أرشيف + رقم طلب تلقائي</title>
 
-  <!-- QR library (preview only) -->
+  <!-- QR (preview) -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <!-- Download as image -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <style>
     :root{
@@ -19,6 +21,7 @@
       --btn2:#2563eb;
       --danger:#dc2626;
       --ok:#16a34a;
+      --warn:#f59e0b;
     }
     *{box-sizing:border-box}
     body{
@@ -28,7 +31,7 @@
       color:var(--text);
     }
     .wrap{
-      max-width:1200px;
+      max-width:1280px;
       margin:18px auto;
       padding:14px;
       display:grid;
@@ -36,7 +39,7 @@
       gap:14px;
     }
     @media (max-width: 980px){
-      .wrap{grid-template-columns:1fr; }
+      .wrap{grid-template-columns:1fr;}
     }
     .panel{
       background:var(--card);
@@ -82,13 +85,14 @@
       border-radius:12px;
       font-weight:800;
       font-size:14px;
+      white-space:nowrap;
     }
     .btn-dark{background:var(--btn);color:#fff}
     .btn-blue{background:var(--btn2);color:#fff}
     .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--text);font-weight:700}
     .btn-danger{background:var(--danger);color:#fff}
     .btn-ok{background:var(--ok);color:#fff}
-
+    .btn-warn{background:var(--warn);color:#111}
     .status{
       font-size:12px;
       color:var(--muted);
@@ -131,7 +135,7 @@
       font-size:13px;
     }
 
-    /* Receipt preview (80mm) */
+    /* Receipt preview */
     .receipt-shell{
       display:flex;
       flex-direction:column;
@@ -185,6 +189,77 @@
     }
     #qrPreview{ width:128px;height:128px; }
 
+    /* Archive UI */
+    .section{
+      margin-top:14px;
+      padding-top:12px;
+      border-top:1px solid var(--line);
+    }
+    .mini{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.6;
+    }
+    .arch-head{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .arch-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:12px;
+      margin-top:10px;
+      background:#fff;
+    }
+    .table th,.table td{
+      padding:10px;
+      border-bottom:1px solid var(--line);
+      font-size:12px;
+      text-align:right;
+      vertical-align:middle;
+    }
+    .table th{
+      background:#f9fafb;
+      color:#374151;
+      font-weight:800;
+      white-space:nowrap;
+    }
+    .table tr:last-child td{border-bottom:none}
+    .pill{
+      display:inline-flex;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:#fff;
+      font-weight:700;
+      font-size:12px;
+      color:#111;
+    }
+    .rowbtns{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      justify-content:flex-start;
+    }
+    .btn-xs{
+      padding:7px 10px;
+      border-radius:10px;
+      font-size:12px;
+      font-weight:800;
+    }
+
     /* Print: only receipt, 80mm */
     @media print{
       body{background:#fff}
@@ -211,7 +286,27 @@
 
     <!-- FORM PANEL -->
     <div class="panel">
-      <h2>إدخال البيانات (فاتورة 80mm مثل التذكرة)</h2>
+      <h2>إدخال البيانات (80mm + تحميل صورة + أرشيف + رقم طلب تلقائي)</h2>
+
+      <!-- Auto Order ID Tools -->
+      <div class="grid" style="margin-bottom:10px;">
+        <div>
+          <label>Prefix لرقم الطلب (اختياري)</label>
+          <input id="orderPrefix" value="ORD-">
+        </div>
+        <div>
+          <label>طول الرقم (padding)</label>
+          <input id="orderPad" type="number" min="1" value="6">
+        </div>
+        <div style="grid-column:1 / -1;">
+          <div class="btns" style="margin-top:6px;">
+            <button class="btn-blue" type="button" onclick="newOrderId()">➕ رقم طلب جديد</button>
+            <button class="btn-ghost" type="button" onclick="resetOrderCounter()">🔁 Reset العدّاد</button>
+            <span class="status" id="statusBox">الحالة: جاهز</span>
+          </div>
+          <div class="mini">✅ كل مرة تضغط “رقم طلب جديد” كيزيد تلقائيًا (محفوظ حتى لو خرجت من الصفحة).</div>
+        </div>
+      </div>
 
       <div class="grid">
         <div>
@@ -234,7 +329,7 @@
 
         <div>
           <label>Order ID / رقم الطلب</label>
-          <input id="orderId" value="100243">
+          <input id="orderId" value="">
         </div>
         <div>
           <label>التاريخ والوقت</label>
@@ -259,16 +354,16 @@
 
         <div>
           <label>اسم الزبون</label>
-          <input id="customerName" value="Ivan">
+          <input id="customerName" value="">
         </div>
         <div>
           <label>هاتف الزبون</label>
-          <input id="customerPhone" value="+2120604535185">
+          <input id="customerPhone" value="">
         </div>
 
         <div style="grid-column:1 / -1;">
           <label>عنوان الزبون</label>
-          <textarea id="customerAddress">H9GM+8VP, Av. 2 Mars, Casablanca 20250, Morocco</textarea>
+          <textarea id="customerAddress"></textarea>
         </div>
 
         <div>
@@ -277,7 +372,7 @@
         </div>
         <div>
           <label>QR (رابط التطبيق) - اختياري</label>
-          <input id="appLink" value="https://example.com/app">
+          <input id="appLink" value="">
         </div>
 
         <div>
@@ -304,7 +399,7 @@
         </div>
         <div>
           <label>نص أسفل الفاتورة</label>
-          <input id="footerText" value="bladigo. Bladigo 2025">
+          <input id="footerText" value="Thank you">
         </div>
       </div>
 
@@ -320,9 +415,9 @@
         </thead>
         <tbody id="itemsBody">
           <tr>
-            <td><input class="i-name" value="كبسة دجاج تقليدية"></td>
+            <td><input class="i-name" value="منتج 1"></td>
             <td><input class="i-qty" type="number" min="1" value="1"></td>
-            <td><input class="i-price" type="number" min="0" step="0.01" value="35"></td>
+            <td><input class="i-price" type="number" min="0" step="0.01" value="0"></td>
             <td><button class="btn-danger" type="button" onclick="removeItem(this)">حذف</button></td>
           </tr>
         </tbody>
@@ -332,21 +427,65 @@
         <button class="btn-blue" type="button" onclick="addItem()">+ إضافة منتج</button>
         <button class="btn-ghost" type="button" onclick="renderReceipt()">تحديث</button>
 
-        <!-- Normal print (best for Bluetooth printer via OS) -->
-        <button class="btn-dark" type="button" onclick="window.print()">🖨️ طباعة (العادية)</button>
+        <button class="btn-dark" type="button" onclick="window.print()">🖨️ طباعة</button>
 
-        <!-- Bluetooth BLE direct print -->
-        <button class="btn-ok" type="button" onclick="bleConnect()">🔵 ربط Bluetooth</button>
-        <button class="btn-blue" type="button" onclick="blePrint()">🔵 Print Bluetooth</button>
-        <button class="btn-ghost" type="button" onclick="bleDisconnect()">فصل</button>
+        <!-- Download receipt as image + Auto archive -->
+        <button class="btn-ghost" type="button" onclick="downloadReceiptImage(true)">🖼️ تحميل الفاتورة صورة</button>
 
-        <div class="status" id="bleStatus">Bluetooth: غير متصل</div>
+        <!-- Manual archive -->
+        <button class="btn-ok" type="button" onclick="archiveCurrentInvoice()">✅ حفظ في الأرشيف</button>
       </div>
 
-      <div style="margin-top:10px;color:var(--muted);font-size:12px;line-height:1.6">
-        ✅ الأفضل: ربط الطابعة بالبلوتوث من إعدادات الهاتف/PC ثم استعمل زر “طباعة (العادية)” واختر الطابعة.<br>
-        ⚠️ زر “Print Bluetooth” كيخدم فقط مع طابعات BLE ESC/POS وبعض الأجهزة/المتصفحات (Chrome Android + https).<br>
-        ⚠️ العربية عبر BLE قد لا تظهر في بعض الطابعات (يعتمد على دعم الطابعة).
+      <div class="mini">
+        ✅ “تحميل صورة” كيدخل الفاتورة تلقائيًا للأرشيف + كيسجل رقم الزبون.
+      </div>
+
+      <!-- ARCHIVE -->
+      <div class="section">
+        <div class="arch-head">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <h2 style="margin:0;">📁 الأرشيف</h2>
+            <span class="pill" id="archiveCount">0 فاتورة</span>
+            <span class="pill" id="customersCount">0 رقم زبون</span>
+          </div>
+
+          <div class="arch-actions">
+            <input id="archiveSearch" placeholder="بحث: رقم الطلب / الهاتف / الاسم..." style="width:280px;max-width:100%;">
+            <button class="btn-ghost btn-xs" type="button" onclick="exportArchiveJSON()">⬇️ تصدير JSON</button>
+            <button class="btn-danger btn-xs" type="button" onclick="clearArchive()">🗑️ حذف كل الأرشيف</button>
+          </div>
+        </div>
+
+        <table class="table" id="archiveTable">
+          <thead>
+            <tr>
+              <th>التاريخ</th>
+              <th>Order</th>
+              <th>الزبون</th>
+              <th>الهاتف</th>
+              <th>المجموع</th>
+              <th>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="archiveBody"></tbody>
+        </table>
+
+        <div class="section" style="margin-top:12px;">
+          <div class="arch-head">
+            <h2 style="margin:0;">📞 أرقام الزبائن المسجلة</h2>
+            <button class="btn-ghost btn-xs" type="button" onclick="clearCustomers()">🗑️ حذف لائحة الأرقام</button>
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>الهاتف</th>
+                <th>عدد المرات</th>
+                <th>آخر تاريخ</th>
+              </tr>
+            </thead>
+            <tbody id="customersBody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -362,7 +501,7 @@
 
         <div class="row2">
           <div class="bold">Order ID:</div>
-          <div class="bold auto-dir" id="rOrderId">100243</div>
+          <div class="bold auto-dir" id="rOrderId">ORD-000001</div>
         </div>
         <div class="small auto-dir" id="rDateTime">31 Jan 2026 17:04</div>
 
@@ -375,9 +514,9 @@
 
         <div class="sep"></div>
 
-        <div class="bold auto-dir" id="rCustomerName">Ivan</div>
-        <div class="small auto-dir" id="rCustomerAddress">H9GM+8VP, Av. 2 Mars, Casablanca 20250, Morocco</div>
-        <div class="small auto-dir" id="rCustomerPhone">+2120604535185</div>
+        <div class="bold auto-dir" id="rCustomerName">Customer</div>
+        <div class="small auto-dir" id="rCustomerAddress">Address</div>
+        <div class="small auto-dir" id="rCustomerPhone">Phone</div>
 
         <div class="sep"></div>
 
@@ -419,24 +558,101 @@
         </div>
 
         <div class="sep"></div>
-        <div class="center small auto-dir" id="rFooter">bladigo. Bladigo 2025</div>
+        <div class="center small auto-dir" id="rFooter">Thank you</div>
       </div>
     </div>
 
   </div>
 
   <script>
-    // Helpers
+    /* =========================
+       Helpers + Status
+    ========================= */
     const $ = (id)=>document.getElementById(id);
     const money = (n)=>Number(n||0).toFixed(2);
 
-    // QR (preview only)
-    let qrObj = null;
+    function setStatus(msg){
+      $("statusBox").textContent = "الحالة: " + msg;
+    }
+
+    function escapeHtml(str){
+      return String(str||"")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function formatDateTime(dtLocal){
+      if(!dtLocal) return "";
+      const d = new Date(dtLocal);
+      if(isNaN(d.getTime())) return dtLocal;
+      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const dd = String(d.getDate()).padStart(2,"0");
+      const mon = months[d.getMonth()];
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2,"0");
+      const mm = String(d.getMinutes()).padStart(2,"0");
+      return `${dd} ${mon} ${yyyy} ${hh}:${mm}`;
+    }
+
+    function isoNow(){
+      return new Date().toISOString();
+    }
+
+    /* =========================
+       AUTO ORDER ID (Counter)
+    ========================= */
+    const ORDER_COUNTER_KEY = "order_counter_v1";
+
+    function getCounter(){
+      const raw = localStorage.getItem(ORDER_COUNTER_KEY);
+      const n = Number(raw || 0);
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function setCounter(n){
+      localStorage.setItem(ORDER_COUNTER_KEY, String(Number(n || 0)));
+    }
+
+    function padNumber(n, width){
+      const s = String(Math.max(0, Number(n || 0)));
+      const w = Math.max(1, Number(width || 1));
+      if(s.length >= w) return s;
+      return "0".repeat(w - s.length) + s;
+    }
+
+    function makeOrderId(nextNumber){
+      const prefix = ($("orderPrefix").value || "").trim();
+      const padW = Number($("orderPad").value || 6);
+      return `${prefix}${padNumber(nextNumber, padW)}`;
+    }
+
+    function newOrderId(){
+      let c = getCounter();
+      c = c + 1;
+      setCounter(c);
+      $("orderId").value = makeOrderId(c);
+      setStatus("تم توليد رقم طلب جديد ✅");
+      renderReceipt();
+    }
+
+    function resetOrderCounter(){
+      const ok = confirm("هل تريد Reset للعدّاد؟ سيعود إلى 0.");
+      if(!ok) return;
+      setCounter(0);
+      setStatus("تم Reset ✅");
+    }
+
+    /* =========================
+       QR (preview)
+    ========================= */
     function buildQR(text){
       const box = $("qrPreview");
       box.innerHTML = "";
       if(!text) return;
-      qrObj = new QRCode(box, {
+      new QRCode(box, {
         text,
         width: 120,
         height: 120,
@@ -444,7 +660,9 @@
       });
     }
 
-    // Items
+    /* =========================
+       Items CRUD
+    ========================= */
     function addItem(){
       const tr = document.createElement("tr");
       tr.innerHTML = `
@@ -456,6 +674,7 @@
       $("itemsBody").appendChild(tr);
       renderReceipt();
     }
+
     function removeItem(btn){
       const tbody = $("itemsBody");
       const row = btn.closest("tr");
@@ -478,17 +697,24 @@
       })).filter(x=>x.name && x.qty>0);
     }
 
-    function formatDateTime(dtLocal){
-      if(!dtLocal) return "";
-      const d = new Date(dtLocal);
-      if(isNaN(d.getTime())) return dtLocal;
-      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-      const dd = String(d.getDate()).padStart(2,"0");
-      const mon = months[d.getMonth()];
-      const yyyy = d.getFullYear();
-      const hh = String(d.getHours()).padStart(2,"0");
-      const mm = String(d.getMinutes()).padStart(2,"0");
-      return `${dd} ${mon} ${yyyy} ${hh}:${mm}`;
+    /* =========================
+       Totals + Receipt render
+    ========================= */
+    function calcTotals(){
+      const items = getItems();
+      let itemSum = 0;
+      items.forEach(it => itemSum += (it.qty * it.price));
+
+      const discount = Number($("discount").value || 0);
+      const coupon = Number($("couponDiscount").value || 0);
+      const tax = Number($("tax").value || 0);
+      const tips = Number($("tips").value || 0);
+      const deliveryFee = Number($("deliveryFee").value || 0);
+
+      const subtotal = itemSum;
+      const total = Math.max(subtotal - discount - coupon, 0) + tax + tips + deliveryFee;
+
+      return { itemSum, subtotal, discount, coupon, tax, tips, deliveryFee, total };
     }
 
     function renderReceipt(){
@@ -514,12 +740,8 @@
       const items = getItems();
       const tbody = $("rItems");
       tbody.innerHTML = "";
-      let itemPriceSum = 0;
-
       items.forEach((it, idx)=>{
         const line = it.qty * it.price;
-        itemPriceSum += line;
-
         const tr = document.createElement("tr");
         tr.innerHTML = `
           <td class="left">${idx+1}</td>
@@ -530,93 +752,85 @@
         tbody.appendChild(tr);
       });
 
-      const discount = Number($("discount").value || 0);
-      const coupon = Number($("couponDiscount").value || 0);
-      const tax = Number($("tax").value || 0);
-      const tips = Number($("tips").value || 0);
-      const deliveryFee = Number($("deliveryFee").value || 0);
-
-      const subtotal = itemPriceSum;
-      const total = Math.max(subtotal - discount - coupon, 0) + tax + tips + deliveryFee;
-
-      $("rItemPrice").textContent = money(itemPriceSum);
-      $("rSubtotal").textContent = money(subtotal);
-      $("rDiscount").textContent = money(discount);
-      $("rCoupon").textContent = money(coupon);
-      $("rTax").textContent = money(tax);
-      $("rTips").textContent = money(tips);
-      $("rDeliveryFee").textContent = money(deliveryFee);
-      $("rTotal").textContent = money(total);
+      const t = calcTotals();
+      $("rItemPrice").textContent = money(t.itemSum);
+      $("rSubtotal").textContent = money(t.subtotal);
+      $("rDiscount").textContent = money(t.discount);
+      $("rCoupon").textContent = money(t.coupon);
+      $("rTax").textContent = money(t.tax);
+      $("rTips").textContent = money(t.tips);
+      $("rDeliveryFee").textContent = money(t.deliveryFee);
+      $("rTotal").textContent = money(t.total);
 
       $("rFooter").textContent = $("footerText").value || "";
       buildQR(($("appLink").value || "").trim());
 
-      saveToLocal();
+      saveDraftToLocal();
     }
 
-    function escapeHtml(str){
-      return String(str||"")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
-
-    // LocalStorage
-    function saveToLocal(){
-      localStorage.setItem("receipt_builder_v2", JSON.stringify(collectData()));
-    }
-    function loadFromLocal(){
-      const raw = localStorage.getItem("receipt_builder_v2");
-      if(!raw) return false;
+    /* =========================
+       Download PNG (and archive)
+    ========================= */
+    async function downloadReceiptImage(addToArchiveAfter){
       try{
-        const d = JSON.parse(raw);
-        if(!d) return false;
-        const set = (id,val)=>{ if($(id)) $(id).value = val ?? ""; };
+        renderReceipt();
 
-        set("shopName", d.shopName);
-        set("shopStreet", d.shopStreet);
-        set("shopPhone", d.shopPhone);
-        set("shopEmail", d.shopEmail);
-        set("orderId", d.orderId);
-        set("orderDateTime", d.orderDateTime);
-        set("orderType", d.orderType);
-        set("paymentMethod", d.paymentMethod);
-        set("customerName", d.customerName);
-        set("customerPhone", d.customerPhone);
-        set("customerAddress", d.customerAddress);
-        set("currency", d.currency);
-        set("appLink", d.appLink);
-        set("discount", d.discount);
-        set("couponDiscount", d.couponDiscount);
-        set("tax", d.tax);
-        set("tips", d.tips);
-        set("deliveryFee", d.deliveryFee);
-        set("footerText", d.footerText);
-
-        const tbody = $("itemsBody");
-        tbody.innerHTML = "";
-        (d.items || []).forEach(it=>{
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td><input class="i-name" value="${escapeHtml(it.name)}"></td>
-            <td><input class="i-qty" type="number" min="1" value="${it.qty || 1}"></td>
-            <td><input class="i-price" type="number" min="0" step="0.01" value="${it.price || 0}"></td>
-            <td><button class="btn-danger" type="button" onclick="removeItem(this)">حذف</button></td>
-          `;
-          tbody.appendChild(tr);
-        });
-        if(!tbody.rows.length){
-          addItem();
+        // If orderId empty, generate one automatically
+        if(!($("orderId").value || "").trim()){
+          newOrderId();
         }
-        return true;
-      }catch(e){
-        return false;
+
+        setStatus("تحضير الصورة...");
+
+        const el = $("receipt");
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true
+        });
+
+        const orderId = ($("orderId").value || "invoice").trim() || "invoice";
+        const fileName = `invoice_${orderId}_${Date.now()}.png`;
+
+        canvas.toBlob((blob)=>{
+          if(!blob){
+            const url = canvas.toDataURL("image/png");
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          }else{
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          }
+
+          if(addToArchiveAfter){
+            archiveCurrentInvoice();
+          }
+
+          setStatus("تم تحميل الصورة ✅");
+        }, "image/png");
+      }catch(err){
+        setStatus("فشل تحميل الصورة: " + (err?.message || err));
       }
     }
-    function collectData(){
+
+    /* =========================
+       Draft save (current form)
+    ========================= */
+    function collectDraft(){
       return {
+        orderPrefix: $("orderPrefix").value,
+        orderPad: $("orderPad").value,
+
         shopName: $("shopName").value,
         shopStreet: $("shopStreet").value,
         shopPhone: $("shopPhone").value,
@@ -640,12 +854,295 @@
       };
     }
 
-    // Auto render
+    function saveDraftToLocal(){
+      localStorage.setItem("receipt_draft_v2", JSON.stringify(collectDraft()));
+    }
+
+    function loadDraftFromLocal(){
+      const raw = localStorage.getItem("receipt_draft_v2");
+      if(!raw) return false;
+      try{
+        const d = JSON.parse(raw);
+        if(!d) return false;
+        applyDraft(d);
+        return true;
+      }catch(e){
+        return false;
+      }
+    }
+
+    function applyDraft(d){
+      const set = (id,val)=>{ if($(id)) $(id).value = val ?? ""; };
+
+      set("orderPrefix", d.orderPrefix ?? "ORD-");
+      set("orderPad", d.orderPad ?? 6);
+
+      set("shopName", d.shopName);
+      set("shopStreet", d.shopStreet);
+      set("shopPhone", d.shopPhone);
+      set("shopEmail", d.shopEmail);
+      set("orderId", d.orderId);
+      set("orderDateTime", d.orderDateTime);
+      set("orderType", d.orderType);
+      set("paymentMethod", d.paymentMethod);
+      set("customerName", d.customerName);
+      set("customerPhone", d.customerPhone);
+      set("customerAddress", d.customerAddress);
+      set("currency", d.currency);
+      set("appLink", d.appLink);
+      set("discount", d.discount);
+      set("couponDiscount", d.couponDiscount);
+      set("tax", d.tax);
+      set("tips", d.tips);
+      set("deliveryFee", d.deliveryFee);
+      set("footerText", d.footerText);
+
+      const tbody = $("itemsBody");
+      tbody.innerHTML = "";
+      (d.items || []).forEach(it=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><input class="i-name" value="${escapeHtml(it.name)}"></td>
+          <td><input class="i-qty" type="number" min="1" value="${it.qty || 1}"></td>
+          <td><input class="i-price" type="number" min="0" step="0.01" value="${it.price || 0}"></td>
+          <td><button class="btn-danger" type="button" onclick="removeItem(this)">حذف</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      if(!tbody.rows.length){
+        addItem();
+      }
+    }
+
+    /* =========================
+       ARCHIVE + CUSTOMERS (LocalStorage)
+    ========================= */
+    const ARCHIVE_KEY = "invoice_archive_v2";
+    const CUSTOMERS_KEY = "customers_phones_v2";
+
+    function getArchive(){
+      const raw = localStorage.getItem(ARCHIVE_KEY);
+      if(!raw) return [];
+      try { return JSON.parse(raw) || []; } catch(e){ return []; }
+    }
+    function saveArchive(arr){
+      localStorage.setItem(ARCHIVE_KEY, JSON.stringify(arr));
+    }
+
+    function getCustomers(){
+      const raw = localStorage.getItem(CUSTOMERS_KEY);
+      if(!raw) return [];
+      try { return JSON.parse(raw) || []; } catch(e){ return []; }
+    }
+    function saveCustomers(arr){
+      localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(arr));
+    }
+
+    function collectInvoiceForArchive(){
+      const draft = collectDraft();
+      const totals = calcTotals();
+      const createdAt = isoNow();
+      const archId = `${(draft.orderId || "ORDER")}-${Date.now()}`;
+
+      return {
+        id: archId,
+        createdAt,
+        ...draft,
+        totals
+      };
+    }
+
+    function upsertCustomerPhone(phone, createdAt){
+      phone = String(phone || "").trim();
+      if(!phone) return;
+
+      const list = getCustomers();
+      const idx = list.findIndex(x => x.phone === phone);
+      if(idx === -1){
+        list.push({ phone, count: 1, lastAt: createdAt });
+      }else{
+        list[idx].count = Number(list[idx].count || 0) + 1;
+        list[idx].lastAt = createdAt;
+      }
+      list.sort((a,b)=> (b.count||0) - (a.count||0));
+      saveCustomers(list);
+    }
+
+    function archiveCurrentInvoice(){
+      try{
+        renderReceipt();
+
+        // If orderId empty, generate automatically
+        if(!($("orderId").value || "").trim()){
+          newOrderId();
+        }
+
+        const inv = collectInvoiceForArchive();
+        const arr = getArchive();
+
+        // prevent duplicates near-in-time
+        const recent = arr.find(x =>
+          x.orderId === inv.orderId &&
+          Math.abs(new Date(x.createdAt).getTime() - new Date(inv.createdAt).getTime()) < 5000
+        );
+        if(recent){
+          setStatus("موجودة بالأرشيف (قريباً) ✅");
+          renderArchiveUI();
+          return;
+        }
+
+        arr.unshift(inv);
+        saveArchive(arr);
+
+        upsertCustomerPhone(inv.customerPhone, inv.createdAt);
+
+        setStatus("تم حفظ الفاتورة في الأرشيف ✅");
+        renderArchiveUI();
+      }catch(err){
+        setStatus("فشل حفظ الأرشيف: " + (err?.message || err));
+      }
+    }
+
+    function clearArchive(){
+      const ok = confirm("هل تريد حذف كل الأرشيف؟");
+      if(!ok) return;
+      localStorage.removeItem(ARCHIVE_KEY);
+      renderArchiveUI();
+      setStatus("تم حذف الأرشيف");
+    }
+
+    function clearCustomers(){
+      const ok = confirm("هل تريد حذف لائحة أرقام الزبائن؟");
+      if(!ok) return;
+      localStorage.removeItem(CUSTOMERS_KEY);
+      renderArchiveUI();
+      setStatus("تم حذف الأرقام");
+    }
+
+    function deleteInvoice(id){
+      const ok = confirm("حذف هذه الفاتورة من الأرشيف؟");
+      if(!ok) return;
+      const arr = getArchive().filter(x => x.id !== id);
+      saveArchive(arr);
+      renderArchiveUI();
+      setStatus("تم الحذف ✅");
+    }
+
+    function openInvoiceFromArchive(id){
+      const arr = getArchive();
+      const inv = arr.find(x => x.id === id);
+      if(!inv){
+        setStatus("لم يتم العثور على الفاتورة");
+        return;
+      }
+      applyDraft(inv);
+      renderReceipt();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setStatus("تم فتح الفاتورة من الأرشيف ✅");
+    }
+
+    async function downloadImageFromArchive(id){
+      const arr = getArchive();
+      const inv = arr.find(x => x.id === id);
+      if(!inv){
+        setStatus("لم يتم العثور على الفاتورة");
+        return;
+      }
+      applyDraft(inv);
+      renderReceipt();
+      await downloadReceiptImage(false);
+      setStatus("تم تحميل الصورة من الأرشيف ✅");
+    }
+
+    function exportArchiveJSON(){
+      const arr = getArchive();
+      const blob = new Blob([JSON.stringify(arr, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice_archive_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setStatus("تم تصدير JSON ✅");
+    }
+
+    function renderArchiveUI(){
+      const arr = getArchive();
+      const customers = getCustomers();
+
+      $("archiveCount").textContent = `${arr.length} فاتورة`;
+      $("customersCount").textContent = `${customers.length} رقم زبون`;
+
+      const q = ($("archiveSearch").value || "").trim().toLowerCase();
+      const filtered = !q ? arr : arr.filter(x => {
+        const s = [x.orderId, x.customerName, x.customerPhone, x.customerAddress, x.createdAt].join(" ").toLowerCase();
+        return s.includes(q);
+      });
+
+      const body = $("archiveBody");
+      body.innerHTML = "";
+
+      filtered.slice(0, 300).forEach(inv => {
+        const created = inv.createdAt ? new Date(inv.createdAt) : null;
+        const dt = created ? created.toLocaleString() : (inv.orderDateTime || "");
+        const cur = inv.currency || "";
+        const total = inv?.totals?.total ?? 0;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="auto-dir">${escapeHtml(dt)}</td>
+          <td class="auto-dir"><strong>${escapeHtml(inv.orderId || "")}</strong></td>
+          <td class="auto-dir">${escapeHtml(inv.customerName || "")}</td>
+          <td class="auto-dir">${escapeHtml(inv.customerPhone || "")}</td>
+          <td class="auto-dir"><strong>${money(total)} ${escapeHtml(cur)}</strong></td>
+          <td>
+            <div class="rowbtns">
+              <button class="btn-ghost btn-xs" type="button" onclick="openInvoiceFromArchive('${inv.id}')">فتح</button>
+              <button class="btn-blue btn-xs" type="button" onclick="downloadImageFromArchive('${inv.id}')">تحميل صورة</button>
+              <button class="btn-danger btn-xs" type="button" onclick="deleteInvoice('${inv.id}')">حذف</button>
+            </div>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+
+      if(filtered.length === 0){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="6" class="mini">لا توجد نتائج.</td>`;
+        body.appendChild(tr);
+      }
+
+      const cbody = $("customersBody");
+      cbody.innerHTML = "";
+      customers.slice(0, 300).forEach(c=>{
+        const dt = c.lastAt ? new Date(c.lastAt).toLocaleString() : "";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="auto-dir"><strong>${escapeHtml(c.phone)}</strong></td>
+          <td class="auto-dir">${escapeHtml(String(c.count || 0))}</td>
+          <td class="auto-dir">${escapeHtml(dt)}</td>
+        `;
+        cbody.appendChild(tr);
+      });
+
+      if(customers.length === 0){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="3" class="mini">لا توجد أرقام محفوظة بعد.</td>`;
+        cbody.appendChild(tr);
+      }
+    }
+
+    /* =========================
+       Auto render on input
+    ========================= */
     function wireAutoRender(){
       document.querySelectorAll("input, textarea, select").forEach(el=>{
         el.addEventListener("input", renderReceipt);
         el.addEventListener("change", renderReceipt);
       });
+
       $("itemsBody").addEventListener("input", (e)=>{
         if(e.target.classList.contains("i-name") ||
            e.target.classList.contains("i-qty") ||
@@ -653,247 +1150,31 @@
           renderReceipt();
         }
       });
+
+      $("archiveSearch").addEventListener("input", renderArchiveUI);
     }
 
-    /* ===========================
-       BLUETOOTH (Web Bluetooth BLE)
-       ===========================
-       ملاحظة: يعتمد على موديل الطابعة. كثير من طابعات ESC/POS BLE تستعمل:
-       - Service UUID: 0xFFE0
-       - Characteristic UUID: 0xFFE1
-       لكن ليس دائماً.
-    */
-    let bleDevice = null;
-    let bleChar = null;
-
-    function setBleStatus(msg){
-      $("bleStatus").textContent = "Bluetooth: " + msg;
-    }
-
-    async function bleConnect(){
-      try{
-        if(!navigator.bluetooth){
-          setBleStatus("المتصفح لا يدعم Web Bluetooth. استعمل Chrome Android + https.");
-          return;
-        }
-
-        setBleStatus("اختَر الطابعة من اللائحة...");
-
-        // نحاول اختيار أي جهاز مع خدمات شائعة للطابعات
-        bleDevice = await navigator.bluetooth.requestDevice({
-          acceptAllDevices: true,
-          optionalServices: [
-            "0000ffe0-0000-1000-8000-00805f9b34fb", // common
-            "0000ffe1-0000-1000-8000-00805f9b34fb", // sometimes as service
-            "000018f0-0000-1000-8000-00805f9b34fb", // some printers
-          ]
-        });
-
-        bleDevice.addEventListener("gattserverdisconnected", ()=>{
-          bleChar = null;
-          setBleStatus("انقطع الاتصال");
-        });
-
-        const server = await bleDevice.gatt.connect();
-
-        // ابحث عن أي characteristic فيه write
-        const services = await server.getPrimaryServices();
-        for(const s of services){
-          const chars = await s.getCharacteristics();
-          for(const c of chars){
-            const p = c.properties;
-            if(p.write || p.writeWithoutResponse){
-              bleChar = c;
-              setBleStatus("متصل ✅ (" + (bleDevice.name || "Printer") + ")");
-              return;
-            }
-          }
-        }
-
-        setBleStatus("تصلنا بالجهاز ولكن ما لقيناش write characteristic (يمكن الطابعة ما كتدعمش BLE ESC/POS).");
-      }catch(err){
-        setBleStatus("فشل: " + (err?.message || err));
-      }
-    }
-
-    async function bleDisconnect(){
-      try{
-        if(bleDevice?.gatt?.connected) bleDevice.gatt.disconnect();
-      }catch(e){}
-      bleChar = null;
-      setBleStatus("غير متصل");
-    }
-
-    // Build ESC/POS text (80mm ~ 48 chars / line)
-    function buildReceiptText48(){
-      const W = 48;
-      const line = (ch="-") => (ch.repeat(W) + "\n");
-      const center = (txt) => {
-        txt = String(txt || "");
-        if(txt.length >= W) return txt.slice(0,W) + "\n";
-        const pad = Math.floor((W - txt.length)/2);
-        return (" ".repeat(pad) + txt + "\n");
-      };
-      const lr = (l,r) => {
-        l = String(l||"");
-        r = String(r||"");
-        const space = W - l.length - r.length;
-        if(space <= 1) return (l + " " + r).slice(0,W) + "\n";
-        return l + " ".repeat(space) + r + "\n";
-      };
-
-      const shopName = $("shopName").value;
-      const shopStreet = $("shopStreet").value;
-      const shopPhone = $("shopPhone").value;
-      const shopEmail = $("shopEmail").value;
-
-      const orderId = $("orderId").value;
-      const dt = formatDateTime($("orderDateTime").value);
-      const orderType = $("orderType").value;
-      const pay = $("paymentMethod").value;
-
-      const custName = $("customerName").value;
-      const custAddr = $("customerAddress").value;
-      const custPhone = $("customerPhone").value;
-
-      const cur = $("currency").value || "";
-
-      const items = getItems();
-      let sum = 0;
-
-      const discount = Number($("discount").value||0);
-      const coupon = Number($("couponDiscount").value||0);
-      const tax = Number($("tax").value||0);
-      const tips = Number($("tips").value||0);
-      const deliveryFee = Number($("deliveryFee").value||0);
-
-      let out = "";
-      out += center(shopName);
-      out += center(shopStreet);
-      out += center(shopPhone);
-      out += center(shopEmail);
-      out += line();
-
-      out += lr("Order ID:", orderId);
-      out += (dt ? (dt + "\n") : "");
-      out += line();
-
-      out += lr(orderType, pay);
-      out += line();
-
-      out += (custName ? (custName + "\n") : "");
-      if(custAddr){
-        // split address into lines roughly
-        const parts = custAddr.split(/\n|, /).filter(Boolean);
-        for(const p of parts){
-          out += (p.length > W ? p.slice(0,W) : p) + "\n";
-        }
-      }
-      out += (custPhone ? (custPhone + "\n") : "");
-      out += line();
-
-      // Items header
-      out += lr("SL  ITEM", "QTY   PRICE");
-      out += line();
-
-      items.forEach((it, i)=>{
-        const total = it.qty * it.price;
-        sum += total;
-        const left = `${i+1}  ${it.name}`.slice(0, 32);
-        const right = `${it.qty}   ${money(total)}`.slice(0, 14);
-        out += lr(left, right);
-      });
-
-      out += line();
-
-      const subtotal = sum;
-      const totalAll = Math.max(subtotal - discount - coupon, 0) + tax + tips + deliveryFee;
-
-      out += lr("Item Price", `${money(sum)} ${cur}`);
-      out += lr("Subtotal", `${money(subtotal)} ${cur}`);
-      out += lr("Discount", `${money(discount)} ${cur}`);
-      out += lr("Coupon Discount", `${money(coupon)} ${cur}`);
-      out += lr("Vat/Tax(Included)", `${money(tax)} ${cur}`);
-      out += lr("Delivery tips", `${money(tips)} ${cur}`);
-      out += lr("Delivery Fee", `${money(deliveryFee)} ${cur}`);
-
-      out += line();
-
-      out += lr("TOTAL AMOUNT", `${money(totalAll)} ${cur}`);
-      out += line();
-      out += center("Thank You");
-      out += line();
-      out += center($("footerText").value);
-
-      // Feed lines
-      out += "\n\n\n";
-      return out;
-    }
-
-    function escposBytesForText(text){
-      const enc = new TextEncoder(); // UTF-8 (some printers may not support Arabic)
-      const init = new Uint8Array([0x1B,0x40]);        // ESC @
-      const alignCenter = new Uint8Array([0x1B,0x61,0x01]); // ESC a 1
-      const alignLeft = new Uint8Array([0x1B,0x61,0x00]);   // ESC a 0
-      const boldOn = new Uint8Array([0x1B,0x45,0x01]);
-      const boldOff = new Uint8Array([0x1B,0x45,0x00]);
-      const cut = new Uint8Array([0x1D,0x56,0x01]);    // GS V 1 (partial cut, some ignore)
-
-      const body = enc.encode(text);
-
-      // We keep it simple: init + text + cut
-      // (alignment/bold is handled by spaces in text; you can expand if needed)
-      const all = new Uint8Array(init.length + body.length + cut.length);
-      all.set(init, 0);
-      all.set(body, init.length);
-      all.set(cut, init.length + body.length);
-      return all;
-    }
-
-    async function bleWriteAll(u8){
-      if(!bleChar) throw new Error("غير متصل بالطابعة. اضغط 'ربط Bluetooth' أولاً.");
-      const chunkSize = 20; // safest for BLE
-      for(let i=0; i<u8.length; i+=chunkSize){
-        const chunk = u8.slice(i, i+chunkSize);
-        if(bleChar.properties.writeWithoutResponse){
-          await bleChar.writeValueWithoutResponse(chunk);
-        }else{
-          await bleChar.writeValue(chunk);
-        }
-        // tiny delay helps some printers
-        await new Promise(r=>setTimeout(r, 10));
-      }
-    }
-
-    async function blePrint(){
-      try{
-        if(!bleChar){
-          setBleStatus("خاصك تربط الطابعة أولاً");
-          return;
-        }
-        renderReceipt(); // ensure up-to-date
-        setBleStatus("كيطبع...");
-
-        const txt = buildReceiptText48();
-        const bytes = escposBytesForText(txt);
-
-        await bleWriteAll(bytes);
-        setBleStatus("تمت الطباعة ✅");
-      }catch(err){
-        setBleStatus("فشل الطباعة: " + (err?.message || err));
-      }
-    }
-
-    // Init
+    /* =========================
+       Init
+    ========================= */
     (function init(){
+      // default datetime
       const now = new Date();
       const pad = n => String(n).padStart(2,"0");
       const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
       if(!$("orderDateTime").value) $("orderDateTime").value = local;
 
-      loadFromLocal();
+      loadDraftFromLocal();
       wireAutoRender();
       renderReceipt();
+      renderArchiveUI();
+
+      // If no Order ID yet -> generate automatically once
+      if(!($("orderId").value || "").trim()){
+        newOrderId();
+      } else {
+        setStatus("جاهز");
+      }
     })();
   </script>
 </body>
