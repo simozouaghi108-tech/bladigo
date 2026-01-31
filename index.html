@@ -1,11 +1,11 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Receipt Builder - فاتورة مثل التذكرة</title>
+  <title>Receipt Builder - 80mm + Bluetooth</title>
 
-  <!-- QR library -->
+  <!-- QR library (preview only) -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
   <style>
@@ -18,6 +18,7 @@
       --btn:#111827;
       --btn2:#2563eb;
       --danger:#dc2626;
+      --ok:#16a34a;
     }
     *{box-sizing:border-box}
     body{
@@ -37,7 +38,6 @@
     @media (max-width: 980px){
       .wrap{grid-template-columns:1fr; }
     }
-
     .panel{
       background:var(--card);
       border:1px solid var(--line);
@@ -68,12 +68,12 @@
       border-color:#c7d2fe;
       box-shadow:0 0 0 4px rgba(37,99,235,.12);
     }
-
     .btns{
       display:flex;
       gap:10px;
       flex-wrap:wrap;
       margin-top:12px;
+      align-items:center;
     }
     button{
       border:none;
@@ -87,6 +87,18 @@
     .btn-blue{background:var(--btn2);color:#fff}
     .btn-ghost{background:#fff;border:1px solid var(--line);color:var(--text);font-weight:700}
     .btn-danger{background:var(--danger);color:#fff}
+    .btn-ok{background:var(--ok);color:#fff}
+
+    .status{
+      font-size:12px;
+      color:var(--muted);
+      padding:8px 10px;
+      border:1px dashed var(--line);
+      border-radius:12px;
+      flex:1;
+      min-width:220px;
+      background:#fff;
+    }
 
     /* Items table (form) */
     .items{
@@ -127,7 +139,7 @@
       align-items:center;
     }
     .receipt{
-      width:320px;           /* Preview width on screen */
+      width:320px;
       max-width:100%;
       background:#fff;
       border:1px solid var(--line);
@@ -136,10 +148,9 @@
       box-shadow:0 10px 25px rgba(0,0,0,.06);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
       color:#000;
-      direction:ltr;         /* receipts غالباً LTR */
+      direction:ltr;
     }
     .center{text-align:center}
-    .muted{color:#111}
     .sep{border-top:1px solid #000;margin:10px 0}
     .row2{
       display:flex;
@@ -172,18 +183,16 @@
       justify-content:center;
       margin-top:10px;
     }
-    #qrPreview{
-      width:128px;height:128px;
-    }
+    #qrPreview{ width:128px;height:128px; }
 
-    /* Print: only receipt and use 80mm paper */
+    /* Print: only receipt, 80mm */
     @media print{
       body{background:#fff}
       .wrap{display:block; padding:0; margin:0}
       .panel{display:none !important}
       .receipt-shell{display:block}
       .receipt{
-        width:80mm;          /* thermal width */
+        width:80mm;
         border:none;
         border-radius:0;
         box-shadow:none;
@@ -202,7 +211,7 @@
 
     <!-- FORM PANEL -->
     <div class="panel">
-      <h2>إدخال البيانات (وسيتم توليد فاتورة مثل التذكرة)</h2>
+      <h2>إدخال البيانات (فاتورة 80mm مثل التذكرة)</h2>
 
       <div class="grid">
         <div>
@@ -267,7 +276,7 @@
           <input id="currency" value="د.م">
         </div>
         <div>
-          <label>رابط التطبيق داخل QR (اختياري)</label>
+          <label>QR (رابط التطبيق) - اختياري</label>
           <input id="appLink" value="https://example.com/app">
         </div>
 
@@ -321,21 +330,29 @@
 
       <div class="btns">
         <button class="btn-blue" type="button" onclick="addItem()">+ إضافة منتج</button>
-        <button class="btn-ghost" type="button" onclick="renderReceipt()">تحديث الفاتورة</button>
-        <button class="btn-dark" type="button" onclick="window.print()">🖨️ طباعة</button>
-        <button class="btn-ghost" type="button" onclick="fillSample()">تجربة مثال</button>
+        <button class="btn-ghost" type="button" onclick="renderReceipt()">تحديث</button>
+
+        <!-- Normal print (best for Bluetooth printer via OS) -->
+        <button class="btn-dark" type="button" onclick="window.print()">🖨️ طباعة (العادية)</button>
+
+        <!-- Bluetooth BLE direct print -->
+        <button class="btn-ok" type="button" onclick="bleConnect()">🔵 ربط Bluetooth</button>
+        <button class="btn-blue" type="button" onclick="blePrint()">🔵 Print Bluetooth</button>
+        <button class="btn-ghost" type="button" onclick="bleDisconnect()">فصل</button>
+
+        <div class="status" id="bleStatus">Bluetooth: غير متصل</div>
       </div>
 
       <div style="margin-top:10px;color:var(--muted);font-size:12px;line-height:1.6">
-        • للطباعة مثل الصورة: من نافذة الطباعة اختر Paper = 80mm (Receipt).<br>
-        • إذا أردت نفس الشكل تماماً (خطوط/مسافات)، أخبرني باسم التطبيق وشعارك وسأضبطه لك.
+        ✅ الأفضل: ربط الطابعة بالبلوتوث من إعدادات الهاتف/PC ثم استعمل زر “طباعة (العادية)” واختر الطابعة.<br>
+        ⚠️ زر “Print Bluetooth” كيخدم فقط مع طابعات BLE ESC/POS وبعض الأجهزة/المتصفحات (Chrome Android + https).<br>
+        ⚠️ العربية عبر BLE قد لا تظهر في بعض الطابعات (يعتمد على دعم الطابعة).
       </div>
     </div>
 
     <!-- RECEIPT PREVIEW -->
     <div class="receipt-shell">
       <div class="receipt" id="receipt">
-        <!-- Header -->
         <div class="center bold" style="font-size:18px" id="rShopName">Biryani Box</div>
         <div class="center small auto-dir" id="rShopStreet">2 mars</div>
         <div class="center small auto-dir" id="rShopPhone">+212611113425</div>
@@ -358,14 +375,12 @@
 
         <div class="sep"></div>
 
-        <!-- Customer -->
         <div class="bold auto-dir" id="rCustomerName">Ivan</div>
         <div class="small auto-dir" id="rCustomerAddress">H9GM+8VP, Av. 2 Mars, Casablanca 20250, Morocco</div>
         <div class="small auto-dir" id="rCustomerPhone">+2120604535185</div>
 
         <div class="sep"></div>
 
-        <!-- Items -->
         <table class="items-r">
           <thead>
             <tr>
@@ -380,7 +395,6 @@
 
         <div class="sep"></div>
 
-        <!-- Totals -->
         <div class="row2"><div>Item Price</div><div><span id="rItemPrice">0.00</span> <span id="rCur1">د.م</span></div></div>
         <div class="row2"><div>Subtotal</div><div><span id="rSubtotal">0.00</span> <span id="rCur2">د.م</span></div></div>
         <div class="row2"><div>Discount</div><div><span id="rDiscount">0.00</span> <span id="rCur3">د.م</span></div></div>
@@ -400,7 +414,6 @@
 
         <div class="center bold">Thank You</div>
 
-        <!-- QR -->
         <div class="qrbox">
           <div id="qrPreview"></div>
         </div>
@@ -417,7 +430,7 @@
     const $ = (id)=>document.getElementById(id);
     const money = (n)=>Number(n||0).toFixed(2);
 
-    // QR
+    // QR (preview only)
     let qrObj = null;
     function buildQR(text){
       const box = $("qrPreview");
@@ -466,7 +479,6 @@
     }
 
     function formatDateTime(dtLocal){
-      // dtLocal like "2026-01-31T17:04"
       if(!dtLocal) return "";
       const d = new Date(dtLocal);
       if(isNaN(d.getTime())) return dtLocal;
@@ -480,30 +492,25 @@
     }
 
     function renderReceipt(){
-      // Header
       $("rShopName").textContent = $("shopName").value || "";
       $("rShopStreet").textContent = $("shopStreet").value || "";
       $("rShopPhone").textContent = $("shopPhone").value || "";
       $("rShopEmail").textContent = $("shopEmail").value || "";
 
-      // Order meta
       $("rOrderId").textContent = $("orderId").value || "";
       $("rDateTime").textContent = formatDateTime($("orderDateTime").value) || "";
       $("rOrderType").textContent = $("orderType").value || "";
       $("rPayment").textContent = $("paymentMethod").value || "";
 
-      // Customer
       $("rCustomerName").textContent = $("customerName").value || "";
       $("rCustomerAddress").textContent = $("customerAddress").value || "";
       $("rCustomerPhone").textContent = $("customerPhone").value || "";
 
-      // Currency
       const cur = $("currency").value || "";
       ["rCur1","rCur2","rCur3","rCur4","rCur5","rCur6","rCur7","rCur8"].forEach(id=>{
         $(id).textContent = cur;
       });
 
-      // Items table render
       const items = getItems();
       const tbody = $("rItems");
       tbody.innerHTML = "";
@@ -523,7 +530,6 @@
         tbody.appendChild(tr);
       });
 
-      // Totals
       const discount = Number($("discount").value || 0);
       const coupon = Number($("couponDiscount").value || 0);
       const tax = Number($("tax").value || 0);
@@ -542,15 +548,12 @@
       $("rDeliveryFee").textContent = money(deliveryFee);
       $("rTotal").textContent = money(total);
 
-      // Footer + QR
       $("rFooter").textContent = $("footerText").value || "";
       buildQR(($("appLink").value || "").trim());
 
-      // Save (optional)
       saveToLocal();
     }
 
-    // Basic HTML escape for item names
     function escapeHtml(str){
       return String(str||"")
         .replaceAll("&","&amp;")
@@ -560,18 +563,16 @@
         .replaceAll("'","&#039;");
     }
 
-    // LocalStorage (so you don't lose data)
+    // LocalStorage
     function saveToLocal(){
-      const data = collectData();
-      localStorage.setItem("receipt_builder_v1", JSON.stringify(data));
+      localStorage.setItem("receipt_builder_v2", JSON.stringify(collectData()));
     }
     function loadFromLocal(){
-      const raw = localStorage.getItem("receipt_builder_v1");
+      const raw = localStorage.getItem("receipt_builder_v2");
       if(!raw) return false;
       try{
         const d = JSON.parse(raw);
         if(!d) return false;
-
         const set = (id,val)=>{ if($(id)) $(id).value = val ?? ""; };
 
         set("shopName", d.shopName);
@@ -594,7 +595,6 @@
         set("deliveryFee", d.deliveryFee);
         set("footerText", d.footerText);
 
-        // items
         const tbody = $("itemsBody");
         tbody.innerHTML = "";
         (d.items || []).forEach(it=>{
@@ -607,7 +607,6 @@
           `;
           tbody.appendChild(tr);
         });
-
         if(!tbody.rows.length){
           addItem();
         }
@@ -616,7 +615,6 @@
         return false;
       }
     }
-
     function collectData(){
       return {
         shopName: $("shopName").value,
@@ -642,52 +640,12 @@
       };
     }
 
-    function fillSample(){
-      $("shopName").value = "Biryani Box";
-      $("shopStreet").value = "2 mars";
-      $("shopPhone").value = "+212611113425";
-      $("shopEmail").value = "biryani@gmail.com";
-      $("orderId").value = "100243";
-
-      // set current datetime
-      const d = new Date();
-      const pad = n => String(n).padStart(2,"0");
-      const local = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      $("orderDateTime").value = local;
-
-      $("orderType").value = "Delivery";
-      $("paymentMethod").value = "Cash On Delivery";
-      $("customerName").value = "Ivan";
-      $("customerAddress").value = "H9GM+8VP, Av. 2 Mars, Casablanca 20250, Morocco";
-      $("customerPhone").value = "+2120604535185";
-      $("currency").value = "د.م";
-      $("appLink").value = "https://example.com/app";
-      $("discount").value = "0";
-      $("couponDiscount").value = "0";
-      $("tax").value = "0";
-      $("tips").value = "0";
-      $("deliveryFee").value = "0";
-      $("footerText").value = "bladigo. Bladigo 2025";
-
-      $("itemsBody").innerHTML = `
-        <tr>
-          <td><input class="i-name" value="كبسة دجاج تقليدية"></td>
-          <td><input class="i-qty" type="number" min="1" value="1"></td>
-          <td><input class="i-price" type="number" min="0" step="0.01" value="35"></td>
-          <td><button class="btn-danger" type="button" onclick="removeItem(this)">حذف</button></td>
-        </tr>
-      `;
-      renderReceipt();
-    }
-
-    // Auto render on input changes
+    // Auto render
     function wireAutoRender(){
       document.querySelectorAll("input, textarea, select").forEach(el=>{
         el.addEventListener("input", renderReceipt);
         el.addEventListener("change", renderReceipt);
       });
-
-      // items live changes
       $("itemsBody").addEventListener("input", (e)=>{
         if(e.target.classList.contains("i-name") ||
            e.target.classList.contains("i-qty") ||
@@ -697,18 +655,245 @@
       });
     }
 
+    /* ===========================
+       BLUETOOTH (Web Bluetooth BLE)
+       ===========================
+       ملاحظة: يعتمد على موديل الطابعة. كثير من طابعات ESC/POS BLE تستعمل:
+       - Service UUID: 0xFFE0
+       - Characteristic UUID: 0xFFE1
+       لكن ليس دائماً.
+    */
+    let bleDevice = null;
+    let bleChar = null;
+
+    function setBleStatus(msg){
+      $("bleStatus").textContent = "Bluetooth: " + msg;
+    }
+
+    async function bleConnect(){
+      try{
+        if(!navigator.bluetooth){
+          setBleStatus("المتصفح لا يدعم Web Bluetooth. استعمل Chrome Android + https.");
+          return;
+        }
+
+        setBleStatus("اختَر الطابعة من اللائحة...");
+
+        // نحاول اختيار أي جهاز مع خدمات شائعة للطابعات
+        bleDevice = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [
+            "0000ffe0-0000-1000-8000-00805f9b34fb", // common
+            "0000ffe1-0000-1000-8000-00805f9b34fb", // sometimes as service
+            "000018f0-0000-1000-8000-00805f9b34fb", // some printers
+          ]
+        });
+
+        bleDevice.addEventListener("gattserverdisconnected", ()=>{
+          bleChar = null;
+          setBleStatus("انقطع الاتصال");
+        });
+
+        const server = await bleDevice.gatt.connect();
+
+        // ابحث عن أي characteristic فيه write
+        const services = await server.getPrimaryServices();
+        for(const s of services){
+          const chars = await s.getCharacteristics();
+          for(const c of chars){
+            const p = c.properties;
+            if(p.write || p.writeWithoutResponse){
+              bleChar = c;
+              setBleStatus("متصل ✅ (" + (bleDevice.name || "Printer") + ")");
+              return;
+            }
+          }
+        }
+
+        setBleStatus("تصلنا بالجهاز ولكن ما لقيناش write characteristic (يمكن الطابعة ما كتدعمش BLE ESC/POS).");
+      }catch(err){
+        setBleStatus("فشل: " + (err?.message || err));
+      }
+    }
+
+    async function bleDisconnect(){
+      try{
+        if(bleDevice?.gatt?.connected) bleDevice.gatt.disconnect();
+      }catch(e){}
+      bleChar = null;
+      setBleStatus("غير متصل");
+    }
+
+    // Build ESC/POS text (80mm ~ 48 chars / line)
+    function buildReceiptText48(){
+      const W = 48;
+      const line = (ch="-") => (ch.repeat(W) + "\n");
+      const center = (txt) => {
+        txt = String(txt || "");
+        if(txt.length >= W) return txt.slice(0,W) + "\n";
+        const pad = Math.floor((W - txt.length)/2);
+        return (" ".repeat(pad) + txt + "\n");
+      };
+      const lr = (l,r) => {
+        l = String(l||"");
+        r = String(r||"");
+        const space = W - l.length - r.length;
+        if(space <= 1) return (l + " " + r).slice(0,W) + "\n";
+        return l + " ".repeat(space) + r + "\n";
+      };
+
+      const shopName = $("shopName").value;
+      const shopStreet = $("shopStreet").value;
+      const shopPhone = $("shopPhone").value;
+      const shopEmail = $("shopEmail").value;
+
+      const orderId = $("orderId").value;
+      const dt = formatDateTime($("orderDateTime").value);
+      const orderType = $("orderType").value;
+      const pay = $("paymentMethod").value;
+
+      const custName = $("customerName").value;
+      const custAddr = $("customerAddress").value;
+      const custPhone = $("customerPhone").value;
+
+      const cur = $("currency").value || "";
+
+      const items = getItems();
+      let sum = 0;
+
+      const discount = Number($("discount").value||0);
+      const coupon = Number($("couponDiscount").value||0);
+      const tax = Number($("tax").value||0);
+      const tips = Number($("tips").value||0);
+      const deliveryFee = Number($("deliveryFee").value||0);
+
+      let out = "";
+      out += center(shopName);
+      out += center(shopStreet);
+      out += center(shopPhone);
+      out += center(shopEmail);
+      out += line();
+
+      out += lr("Order ID:", orderId);
+      out += (dt ? (dt + "\n") : "");
+      out += line();
+
+      out += lr(orderType, pay);
+      out += line();
+
+      out += (custName ? (custName + "\n") : "");
+      if(custAddr){
+        // split address into lines roughly
+        const parts = custAddr.split(/\n|, /).filter(Boolean);
+        for(const p of parts){
+          out += (p.length > W ? p.slice(0,W) : p) + "\n";
+        }
+      }
+      out += (custPhone ? (custPhone + "\n") : "");
+      out += line();
+
+      // Items header
+      out += lr("SL  ITEM", "QTY   PRICE");
+      out += line();
+
+      items.forEach((it, i)=>{
+        const total = it.qty * it.price;
+        sum += total;
+        const left = `${i+1}  ${it.name}`.slice(0, 32);
+        const right = `${it.qty}   ${money(total)}`.slice(0, 14);
+        out += lr(left, right);
+      });
+
+      out += line();
+
+      const subtotal = sum;
+      const totalAll = Math.max(subtotal - discount - coupon, 0) + tax + tips + deliveryFee;
+
+      out += lr("Item Price", `${money(sum)} ${cur}`);
+      out += lr("Subtotal", `${money(subtotal)} ${cur}`);
+      out += lr("Discount", `${money(discount)} ${cur}`);
+      out += lr("Coupon Discount", `${money(coupon)} ${cur}`);
+      out += lr("Vat/Tax(Included)", `${money(tax)} ${cur}`);
+      out += lr("Delivery tips", `${money(tips)} ${cur}`);
+      out += lr("Delivery Fee", `${money(deliveryFee)} ${cur}`);
+
+      out += line();
+
+      out += lr("TOTAL AMOUNT", `${money(totalAll)} ${cur}`);
+      out += line();
+      out += center("Thank You");
+      out += line();
+      out += center($("footerText").value);
+
+      // Feed lines
+      out += "\n\n\n";
+      return out;
+    }
+
+    function escposBytesForText(text){
+      const enc = new TextEncoder(); // UTF-8 (some printers may not support Arabic)
+      const init = new Uint8Array([0x1B,0x40]);        // ESC @
+      const alignCenter = new Uint8Array([0x1B,0x61,0x01]); // ESC a 1
+      const alignLeft = new Uint8Array([0x1B,0x61,0x00]);   // ESC a 0
+      const boldOn = new Uint8Array([0x1B,0x45,0x01]);
+      const boldOff = new Uint8Array([0x1B,0x45,0x00]);
+      const cut = new Uint8Array([0x1D,0x56,0x01]);    // GS V 1 (partial cut, some ignore)
+
+      const body = enc.encode(text);
+
+      // We keep it simple: init + text + cut
+      // (alignment/bold is handled by spaces in text; you can expand if needed)
+      const all = new Uint8Array(init.length + body.length + cut.length);
+      all.set(init, 0);
+      all.set(body, init.length);
+      all.set(cut, init.length + body.length);
+      return all;
+    }
+
+    async function bleWriteAll(u8){
+      if(!bleChar) throw new Error("غير متصل بالطابعة. اضغط 'ربط Bluetooth' أولاً.");
+      const chunkSize = 20; // safest for BLE
+      for(let i=0; i<u8.length; i+=chunkSize){
+        const chunk = u8.slice(i, i+chunkSize);
+        if(bleChar.properties.writeWithoutResponse){
+          await bleChar.writeValueWithoutResponse(chunk);
+        }else{
+          await bleChar.writeValue(chunk);
+        }
+        // tiny delay helps some printers
+        await new Promise(r=>setTimeout(r, 10));
+      }
+    }
+
+    async function blePrint(){
+      try{
+        if(!bleChar){
+          setBleStatus("خاصك تربط الطابعة أولاً");
+          return;
+        }
+        renderReceipt(); // ensure up-to-date
+        setBleStatus("كيطبع...");
+
+        const txt = buildReceiptText48();
+        const bytes = escposBytesForText(txt);
+
+        await bleWriteAll(bytes);
+        setBleStatus("تمت الطباعة ✅");
+      }catch(err){
+        setBleStatus("فشل الطباعة: " + (err?.message || err));
+      }
+    }
+
     // Init
     (function init(){
-      // default datetime if empty
       const now = new Date();
       const pad = n => String(n).padStart(2,"0");
       const local = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
       if(!$("orderDateTime").value) $("orderDateTime").value = local;
 
-      const loaded = loadFromLocal();
+      loadFromLocal();
       wireAutoRender();
       renderReceipt();
-      if(!loaded) renderReceipt();
     })();
   </script>
 </body>
